@@ -82,6 +82,17 @@ h2 { font-size:clamp(50px,6vw,78px); }
 .toggleChoice { justify-content:space-between; }.toggleChoice.selected { border-width:1px; }
 .switch { width:44px; height:24px; border-radius:20px; background:#c7cac3; padding:3px; flex:0 0 auto; transition:background .2s ease; }.switch span { display:block; width:18px; height:18px; border-radius:50%; background:white; transition:transform .2s ease; }.selected .switch{background:var(--ink)}.selected .switch span{transform:translateX(20px)}
 .optionalFields { margin-top:30px; }
+.instrumentSearch { position:relative; min-width:0; }
+.instrumentResults { position:absolute; z-index:20; top:77px; left:0; right:0; max-height:280px; overflow:auto; background:white; border:1px solid var(--ink); box-shadow:0 12px 30px rgba(23,35,29,.12); }
+.instrumentResults button { width:100%; display:flex; align-items:center; justify-content:space-between; gap:14px; padding:13px 14px; border:0; border-bottom:1px solid #e1e1da; background:white; color:var(--ink); text-align:left; cursor:pointer; }
+.instrumentResults button:last-of-type { border-bottom:0; }.instrumentResults button:hover,.instrumentResults button.active { background:#e7ebe3; }
+.instrumentResults button>span:first-child { min-width:0; }.instrumentResults strong,.instrumentResults small { display:block; }.instrumentResults small { margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted); font-size:12px; }
+.instrumentMeta { flex:0 0 auto; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.6px; }
+.instrumentResults p { margin:0; padding:16px; color:var(--muted); font-size:13px; }
+.searchHint { min-height:18px; margin:7px 0 0; color:var(--muted); font-size:11px; }
+.watchlistTags { display:flex; flex-wrap:wrap; gap:7px; margin-top:11px; }
+.watchlistTag { display:inline-flex; align-items:center; gap:8px; border:1px solid #bfc2b9; background:var(--paper); padding:7px 8px 7px 10px; font-size:12px; }
+.watchlistTag button { display:grid; place-items:center; width:20px; height:20px; padding:0; border:0; background:transparent; color:var(--muted); font-size:18px; cursor:pointer; }
 .notificationList { display:grid; gap:11px; }
 .notificationOption { background:var(--paper); border:1px solid #d2d3cc; padding:18px; }
 .notificationOption.selected { background:white; border-color:var(--ink); }
@@ -100,6 +111,31 @@ h2 { font-size:clamp(50px,6vw,78px); }
 .backButton { background:transparent; color:var(--muted); }.nextButton { background:var(--ink); color:white; min-width:145px; }
 .completion { text-align:center; padding:40px 0; }.completionMark { width:58px; height:58px; border-radius:50%; display:grid; place-items:center; background:var(--ink); color:white; margin:0 auto 28px; font-size:24px; }
 .completion .outlineButton { margin-top:25px; }
+.adminCatalogue .kicker { color:var(--orange); margin-bottom:20px; }.adminRefreshButton { height:52px; border:0; padding:0 22px; margin-top:28px; font-weight:750; }.adminRefreshButton:disabled{opacity:.65}
+
+/* Keep wizard actions visible on shorter laptop screens without changing the layout. */
+@media (min-width:701px) and (max-height:850px) {
+  .setupNav{height:68px}
+  .setupWrap{margin-top:12px;padding-bottom:24px}
+  .progressTrack{margin:10px 0 24px}
+  .setupWrap h1{font-size:56px}
+  .setupLead{font-size:17px;line-height:1.4;margin:10px 0 18px}
+  .defaultNotice{padding:11px 14px;margin:-4px 0 14px}
+  .notificationList{gap:8px}
+  .choice{padding:12px 15px}
+  .toggleChoice{padding-block:8px}
+  .compactChoices .choice{min-height:48px}
+  .fieldGrid,.optionalFields{margin-top:14px}
+  .setupField select,.setupField input{height:46px}
+  .notificationOption{padding:8px 12px}
+  .notificationTime{margin-top:5px;padding-top:5px}
+  .notificationTime input{height:34px}
+  .timeZoneField{margin-top:4px}
+  .summaryEmail{margin-top:10px}
+  .summaryList div{padding:8px 0}
+  .setupActions{margin-top:18px}
+  .setupActions button{height:48px}
+}
 
 @media (max-width:700px) {
   .shell { width:calc(100% - 32px); }.nav{height:76px}.navLink{font-size:0}.navLink span{font-size:18px}.brand{font-size:22px}

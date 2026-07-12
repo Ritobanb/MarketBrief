@@ -9,6 +9,15 @@ async function expectPageDesignIsHealthy(page: import("@playwright/test").Page) 
   expect(design.overflow).toBeLessThanOrEqual(1);
 }
 
+async function expectWizardActionInViewport(page: import("@playwright/test").Page, name: RegExp) {
+  const button = page.getByRole("button", { name });
+  const box = await button.boundingBox();
+  const viewport = page.viewportSize();
+  expect(box).not.toBeNull();
+  expect(viewport).not.toBeNull();
+  expect(box!.y + box!.height).toBeLessThanOrEqual(viewport!.height);
+}
+
 test("homepage signup and sample brief work", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /market, made clear/i })).toBeVisible();
@@ -46,12 +55,14 @@ test("setup exposes defaults, toggles, and a final summary", async ({ page }) =>
   expect(titleDesign.font).toContain("Georgia");
   expect(titleDesign.size).toBeGreaterThanOrEqual(48);
   expect(titleDesign.lineHeight).not.toBe("normal");
+  await expectWizardActionInViewport(page, /continue/i);
   await expect(page.getByRole("button", { name: /^Canadian markets$/ })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: /^US markets$/ })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByLabel("Briefing style")).toHaveValue("Balanced");
   await expect(page.getByLabel("Experience level")).toHaveValue("Beginner-friendly");
   await page.getByRole("button", { name: /continue/i }).click();
   const contentOptions = page.getByTestId("content-options");
+  await expectWizardActionInViewport(page, /continue/i);
   const optionDesign = await contentOptions.evaluate(element => {
     const style = getComputedStyle(element);
     const firstOption = getComputedStyle(element.querySelector("button")!);
@@ -62,7 +73,17 @@ test("setup exposes defaults, toggles, and a final summary", async ({ page }) =>
   const etfToggle = page.getByRole("button", { name: /ETF ideas to watch/i });
   await etfToggle.click();
   await expect(etfToggle).toHaveAttribute("aria-pressed", "true");
-  await page.getByLabel(/Watchlist/).fill("VFV, SHOP");
+  const instrumentSearch = page.getByRole("combobox", { name: /Watchlist/ });
+  await instrumentSearch.fill("NASDAQ:SHOP");
+  await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(1);
+  await instrumentSearch.press("ArrowDown");
+  await instrumentSearch.press("Enter");
+  await expect(page.getByLabel("Selected watchlist instruments").getByText("SHOP · NASDAQ")).toBeVisible();
+  await instrumentSearch.fill("NASDAQ:SHOP");
+  await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(1);
+  await instrumentSearch.press("ArrowDown");
+  await instrumentSearch.press("Enter");
+  await expect(page.getByLabel("Selected watchlist instruments").locator(".watchlistTag")).toHaveCount(1);
   await page.getByRole("button", { name: /continue/i }).click();
   await expect(page.getByRole("heading", { name: "Choose your notifications." })).toBeVisible();
   await expect(page.getByRole("switch", { name: "Daily Market Brief notification" })).toHaveAttribute("aria-checked", "true");
@@ -70,6 +91,7 @@ test("setup exposes defaults, toggles, and a final summary", async ({ page }) =>
   await expect(page.getByRole("switch", { name: "Premarket Brief notification" })).toHaveAttribute("aria-checked", "false");
   await expect(page.getByRole("switch", { name: "Market Close Summary notification" })).toHaveAttribute("aria-checked", "false");
   await expect(page.getByLabel("Time zone")).toHaveValue("America/Toronto");
+  await expectWizardActionInViewport(page, /continue/i);
   await expectPageDesignIsHealthy(page);
   await expect(page.getByTestId("notification-options")).toHaveScreenshot("notification-options.png", { animations: "disabled" });
   await page.getByRole("switch", { name: "Premarket Brief notification" }).click();
@@ -83,11 +105,12 @@ test("setup exposes defaults, toggles, and a final summary", async ({ page }) =>
   await expect(page.getByText("Canadian markets · US markets")).toBeVisible();
   await expect(page.getByText("Balanced", { exact: true })).toBeVisible();
   await expect(page.getByText("Beginner-friendly", { exact: true })).toBeVisible();
-  await expect(page.getByText(/Watchlist: VFV, SHOP/)).toBeVisible();
+  await expect(page.getByText(/Watchlist: SHOP \(NASDAQ\)/)).toBeVisible();
   await expect(page.getByText("Daily Market Brief — 07:00")).toBeVisible();
   await expect(page.getByText("Premarket Brief — 07:30")).toBeVisible();
   await expect(page.getByText("Weekly Market Recap", { exact: true })).not.toBeVisible();
   await expect(page.getByText("America/Vancouver", { exact: true })).toBeVisible();
+  await expectWizardActionInViewport(page, /finish setup/i);
   await page.getByRole("button", { name: /back/i }).click();
   await expect(page.getByRole("switch", { name: "Premarket Brief notification" })).toHaveAttribute("aria-checked", "true");
   await expect(page.locator("#premarket-time")).toHaveValue("07:30");
@@ -95,6 +118,25 @@ test("setup exposes defaults, toggles, and a final summary", async ({ page }) =>
   await page.getByRole("button", { name: /continue/i }).click();
   await page.getByRole("button", { name: /finish setup/i }).click();
   await expect(page.getByRole("heading", { name: "Your brief is ready." })).toBeVisible();
+});
+
+test("local instrument API searches quickly and reports catalogue status", async ({ request, page }) => {
+  await request.get("/api/instruments/search?q=warmup");
+  const started = Date.now();
+  const response = await request.get("/api/instruments/search?q=nvda");
+  expect(response.ok()).toBe(true);
+  expect(Date.now() - started).toBeLessThan(500);
+  const body = await response.json();
+  expect(body.instruments[0].symbol).toBe("NVDA");
+  expect(body.instruments.length).toBeLessThanOrEqual(20);
+  const status = await request.get("/api/admin/instruments/status");
+  expect(status.ok()).toBe(true);
+  expect((await status.json()).lastSuccessfulRefreshAt).toBeTruthy();
+  await page.goto("/admin/catalogue");
+  await expect(page.getByRole("heading", { name: "Instrument refresh status." })).toBeVisible();
+  await expect(page.getByText("Active instruments", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Refresh free catalogue" })).toBeVisible();
+  await expectPageDesignIsHealthy(page);
 });
 
 test("setup requires at least one notification", async ({ page }) => {

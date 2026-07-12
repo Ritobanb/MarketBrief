@@ -1,0 +1,20 @@
+name: Refresh instrument catalogue
+
+on:
+  schedule:
+    - cron: "17 9 * * *"
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refresh the deployed local catalogue
+        env:
+          REFRESH_URL: ${{ secrets.CATALOGUE_REFRESH_URL }}
+          REFRESH_SECRET: ${{ secrets.CATALOGUE_REFRESH_SECRET }}
+        run: |
+          curl --fail --show-error --silent \
+            --request POST \
+            --header "Authorization: Bearer ${REFRESH_SECRET}" \
+            "${REFRESH_URL}"

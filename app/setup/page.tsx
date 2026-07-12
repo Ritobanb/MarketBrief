@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { InstrumentSearch } from "./InstrumentSearch";
 import { createDefaultNotifications, DEFAULT_PREFERENCES, hasEnabledNotification, NOTIFICATION_OPTIONS, NotificationPreference, togglePreference } from "../../lib/preferences";
+import { Instrument } from "../../lib/instruments";
 
 const marketOptions = ["Canadian markets", "US markets", "European markets", "Asia-Pacific markets"];
 const contentOptions = [
@@ -20,7 +22,7 @@ export default function SetupPage() {
   const [experience, setExperience] = useState<string>(DEFAULT_PREFERENCES.experience);
   const [content, setContent] = useState<string[]>([...DEFAULT_PREFERENCES.content]);
   const [name, setName] = useState("");
-  const [watchlist, setWatchlist] = useState("");
+  const [watchlist, setWatchlist] = useState<Instrument[]>([]);
   const [email, setEmail] = useState("");
   const [notifications, setNotifications] = useState<Record<string, NotificationPreference>>(createDefaultNotifications);
   const [timeZone, setTimeZone] = useState("America/Toronto");
@@ -72,7 +74,7 @@ export default function SetupPage() {
           </div>
           <div className="fieldGrid optionalFields">
             <label className="setupField"><span>Name <small>Optional</small></span><input value={name} onChange={event => setName(event.target.value)} placeholder="How should we greet you?" /></label>
-            <label className="setupField"><span>Watchlist <small>Optional</small></span><input value={watchlist} onChange={event => setWatchlist(event.target.value)} placeholder="e.g. SHOP, VFV, MSFT" /></label>
+            <InstrumentSearch selected={watchlist} onChange={setWatchlist} />
           </div>
         </>}
 
@@ -103,7 +105,7 @@ export default function SetupPage() {
             <div><dt>Briefing style</dt><dd>{style}</dd></div>
             <div><dt>Experience</dt><dd>{experience}</dd></div>
             <div><dt>Included content</dt><dd>{content.length ? content.join(" · ") : "Core headlines only"}</dd></div>
-            <div><dt>Optional details</dt><dd>{[name && `Name: ${name}`, watchlist && `Watchlist: ${watchlist}`].filter(Boolean).join(" · ") || "None provided"}</dd></div>
+            <div><dt>Optional details</dt><dd>{[name && `Name: ${name}`, watchlist.length && `Watchlist: ${watchlist.map(item => `${item.symbol} (${item.exchange})`).join(", ")}`].filter(Boolean).join(" · ") || "None provided"}</dd></div>
             <div><dt>Notifications</dt><dd className="notificationSummary">{NOTIFICATION_OPTIONS.filter(option => notifications[option.id].enabled).map(option => <span key={option.id}>{option.title} — {notifications[option.id].time}</span>)}</dd></div>
             <div><dt>Time zone</dt><dd>{timeZone}</dd></div>
           </dl>
