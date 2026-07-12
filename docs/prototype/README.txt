@@ -1,0 +1,1 @@
+Revised MarketBrief prototype with generic-first homepage, optional personalized setup, and no subscription/pricing section.

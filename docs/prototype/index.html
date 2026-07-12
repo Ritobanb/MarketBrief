@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MarketBrief</title>
+<style>
+:root{
+  --bg:#f6f8fb;--surface:#fff;--text:#172033;--muted:#667085;
+  --line:#dfe5ec;--accent:#1f5eff;--accent-dark:#1849c6;
+  --soft:#eef3f8;--shadow:0 12px 34px rgba(18,38,63,.09)
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);line-height:1.5}
+button,input,select{font:inherit}
+.container{width:min(1080px,calc(100% - 32px));margin:auto}
+header{position:sticky;top:0;background:rgba(246,248,251,.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--line);z-index:10}
+.nav{height:70px;display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800}
+.mark{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(135deg,var(--accent),#5f8cff);color:#fff;font-size:.82rem}
+.link-btn{border:0;background:none;color:var(--accent);font-weight:800;cursor:pointer}
+.hero{min-height:calc(100vh - 70px);display:grid;place-items:center;padding:72px 0}
+.hero-inner{text-align:center;max-width:820px}
+.eyebrow{display:inline-block;padding:7px 11px;border-radius:999px;background:#e9f0ff;color:#1d4ed8;font-weight:800;font-size:.84rem;margin-bottom:18px}
+h1{font-size:clamp(2.6rem,6vw,5rem);line-height:1.02;letter-spacing:-.05em;margin:0 0 18px}
+.hero p{max-width:680px;margin:0 auto 30px;color:var(--muted);font-size:1.12rem}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow)}
+.signup{max-width:720px;margin:auto;padding:18px;text-align:left}
+.signup label{display:block;font-weight:800;margin-bottom:8px}
+.signup-row{display:grid;grid-template-columns:1fr auto;gap:10px}
+input,select{width:100%;padding:13px 14px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--text);outline:none}
+input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(31,94,255,.1)}
+.btn{border:0;border-radius:12px;padding:12px 18px;font-weight:800;cursor:pointer}
+.primary{background:var(--accent);color:#fff}
+.primary:hover{background:var(--accent-dark)}
+.secondary{background:#fff;border:1px solid var(--line);color:var(--text)}
+.note{margin-top:10px;color:var(--muted);font-size:.84rem}
+.personal-link{margin-top:22px;color:var(--muted)}
+.personal-link button{border:0;background:none;color:var(--accent);font-weight:800;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.section{padding:82px 0}
+.section h2{font-size:clamp(2rem,4vw,3rem);letter-spacing:-.035em;margin:0 0 10px}
+.section-intro{color:var(--muted);max-width:700px;margin:0 0 28px}
+.sample{max-width:820px;padding:24px}
+.sample-head{display:flex;justify-content:space-between;gap:16px;padding-bottom:16px;border-bottom:1px solid var(--line)}
+.pill{padding:6px 10px;border-radius:999px;background:#eaf8ef;color:#14804a;font-weight:800;font-size:.78rem}
+.moods{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:20px 0}
+.mood{background:var(--soft);padding:13px;border-radius:12px}
+.mood small{display:block;color:var(--muted)}
+.item{display:flex;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.num{width:24px;height:24px;border-radius:8px;background:#e9f0ff;color:var(--accent);display:grid;place-items:center;font-weight:800;flex:0 0 auto}
+.setup{overflow:hidden}
+.setup-top,.setup-actions{padding:18px 24px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line)}
+.setup-actions{border-top:1px solid var(--line);border-bottom:0;background:#fbfcfe}
+.progress{width:220px;height:8px;background:var(--soft);border-radius:999px;overflow:hidden}
+.progress span{display:block;height:100%;width:33.3%;background:var(--accent)}
+.setup-body{padding:30px 24px;min-height:380px}
+.panel{display:none;max-width:720px;margin:auto}
+.panel.active{display:block}
+.panel h3{font-size:1.65rem;margin:0 0 8px}
+.panel>p{color:var(--muted);margin:0 0 20px}
+.default-box{background:#f5f8ff;border:1px solid #d7e2ff;border-radius:13px;padding:12px 14px;margin-bottom:20px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.field{display:flex;flex-direction:column;gap:7px}
+.field.full{grid-column:1/-1}
+.field label{font-weight:750;font-size:.92rem}
+.options{display:grid;gap:12px}
+.option{display:flex;justify-content:space-between;align-items:center;gap:16px;border:1px solid var(--line);border-radius:14px;padding:15px 16px;cursor:pointer}
+.option.active{background:#f5f8ff;border-color:#aec5ff}
+.option small{display:block;color:var(--muted);margin-top:3px}
+.toggle{width:44px;height:24px;border-radius:999px;background:#cbd5e1;position:relative}
+.toggle:after{content:"";position:absolute;width:18px;height:18px;border-radius:50%;background:#fff;top:3px;left:3px;transition:.2s}
+.option.active .toggle{background:var(--accent)}
+.option.active .toggle:after{transform:translateX(20px)}
+.summary{border:1px solid var(--line);border-radius:15px;overflow:hidden;background:#fbfcfe}
+.summary-row{display:flex;justify-content:space-between;gap:20px;padding:13px 15px;border-top:1px solid var(--line)}
+.summary-row:first-child{border-top:0}
+.summary-row span:first-child{color:var(--muted)}
+footer{padding:36px 0 46px;color:var(--muted);font-size:.9rem}
+.footer{border-top:1px solid var(--line);padding-top:22px;display:flex;justify-content:space-between;gap:20px}
+@media(max-width:760px){
+  .signup-row,.grid,.moods{grid-template-columns:1fr}
+  .field.full{grid-column:auto}
+  .setup-top{align-items:flex-start;flex-direction:column}
+  .progress{width:100%}
+  .footer{flex-direction:column}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="container nav">
+    <div class="brand"><div class="mark">MB</div>MarketBrief</div>
+    <button class="link-btn" onclick="go('personalized')">Personalized brief</button>
+  </div>
+</header>
+
+<main>
+<section class="hero">
+  <div class="container hero-inner">
+    <div class="eyebrow">Daily market updates made simple</div>
+    <h1>Your daily market brief, without the noise.</h1>
+    <p>Receive a concise overview of the markets, major developments, and what to watch next. No stock knowledge or watchlist is required.</p>
+
+    <div class="card signup">
+      <label for="genericEmail">Where should we send your daily market brief?</label>
+      <div class="signup-row">
+        <input id="genericEmail" type="email" placeholder="Enter your email address">
+        <button class="btn primary" onclick="activateGeneric(this)">Get the daily brief</button>
+      </div>
+      <div class="note">One concise email each weekday. No complicated setup.</div>
+    </div>
+
+    <div class="personal-link">
+      Prefer a more tailored update?
+      <button onclick="go('personalized')">Create a personalized market brief</button>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <h2>What the daily brief looks like</h2>
+    <p class="section-intro">A short, practical summary designed to be read in a few minutes.</p>
+
+    <div class="card sample">
+      <div class="sample-head">
+        <div><strong>Daily Market Brief</strong><br><small style="color:var(--muted)">Weekday morning edition</small></div>
+        <span class="pill">Sample</span>
+      </div>
+
+      <div class="moods">
+        <div class="mood"><small>US market</small><strong>Neutral</strong></div>
+        <div class="mood"><small>Canada</small><strong>Bullish</strong></div>
+        <div class="mood"><small>Global risk</small><strong>Medium</strong></div>
+      </div>
+
+      <h3>What changed overnight</h3>
+      <div class="item"><div class="num">1</div><div>Technology futures are softer ahead of major earnings.</div></div>
+      <div class="item"><div class="num">2</div><div>Oil prices are higher, supporting Canadian energy names.</div></div>
+      <div class="item"><div class="num">3</div><div>Investors are watching inflation data and central-bank commentary.</div></div>
+    </div>
+  </div>
+</section>
+
+<section id="personalized" class="section">
+  <div class="container">
+    <h2>Create a personalized market brief</h2>
+    <p class="section-intro">Personalization is optional. Keep the defaults whenever you are unsure or prefer not to disclose information.</p>
+
+    <div class="card setup">
+      <div class="setup-top">
+        <div><strong id="stepLabel">Step 1 of 3</strong><br><small style="color:var(--muted)">All fields are optional</small></div>
+        <div class="progress"><span id="progressBar"></span></div>
+      </div>
+
+      <div class="setup-body">
+        <div class="panel active" data-step="1">
+          <h3>Choose your market focus</h3>
+          <p>Leave everything unchanged to receive a balanced general-market briefing.</p>
+          <div class="default-box">Default setup: Canada and US markets, balanced coverage, beginner-friendly language.</div>
+          <div class="grid">
+            <div class="field">
+              <label>Primary market</label>
+              <select id="market">
+                <option>Default — Canada and US</option>
+                <option>Canada</option>
+                <option>United States</option>
+                <option>Global markets</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Briefing style</label>
+              <select id="style">
+                <option>Default — Balanced</option>
+                <option>Long-term investor</option>
+                <option>Active investor</option>
+                <option>Day trader</option>
+              </select>
+            </div>
+            <div class="field full">
+              <label>Experience level</label>
+              <select id="experience">
+                <option>Default — Beginner-friendly</option>
+                <option>Intermediate</option>
+                <option>Advanced</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" data-step="2">
+          <h3>Choose optional preferences</h3>
+          <p>No stock symbols are required. These can stay at their defaults.</p>
+          <div class="options">
+            <div class="option active" onclick="this.classList.toggle('active')">
+              <div><strong>General market overview</strong><small>Included by default</small></div><div class="toggle"></div>
+            </div>
+            <div class="option active" onclick="this.classList.toggle('active')">
+              <div><strong>Top market-moving news</strong><small>Included by default</small></div><div class="toggle"></div>
+            </div>
+            <div class="option" onclick="this.classList.toggle('active')">
+              <div><strong>ETF ideas to watch</strong><small>Optional educational section</small></div><div class="toggle"></div>
+            </div>
+            <div class="option" onclick="this.classList.toggle('active')">
+              <div><strong>Day-trading opportunities</strong><small>Optional higher-risk section</small></div><div class="toggle"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" data-step="3">
+          <h3>Your personalized brief is ready</h3>
+          <p>The default choices work even without any personal details.</p>
+          <div class="summary">
+            <div class="summary-row"><span>Market</span><strong id="sumMarket">Default — Canada and US</strong></div>
+            <div class="summary-row"><span>Style</span><strong id="sumStyle">Default — Balanced</strong></div>
+            <div class="summary-row"><span>Experience</span><strong id="sumExperience">Default — Beginner-friendly</strong></div>
+            <div class="summary-row"><span>Delivery</span><strong>Weekday morning</strong></div>
+          </div>
+          <div class="field" style="margin-top:18px">
+            <label>Email address</label>
+            <input id="personalEmail" type="email" placeholder="Enter your email address">
+          </div>
+        </div>
+      </div>
+
+      <div class="setup-actions">
+        <button class="btn secondary" id="backBtn" onclick="changeStep(-1)" disabled>Back</button>
+        <button class="btn primary" id="nextBtn" onclick="changeStep(1)">Continue</button>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="container footer">
+    <div>© 2026 MarketBrief</div>
+    <div>Market information only. Not investment advice.</div>
+  </div>
+</footer>
+
+<script>
+let step=1;
+function go(id){document.getElementById(id).scrollIntoView({behavior:'smooth'})}
+function activateGeneric(btn){
+  const email=document.getElementById('genericEmail').value.trim();
+  btn.textContent=email?'Daily brief activated':'Enter your email';
+  if(email) btn.disabled=true;
+}
+function changeStep(direction){
+  if(step===3 && direction===1){
+    const email=document.getElementById('personalEmail').value.trim();
+    const btn=document.getElementById('nextBtn');
+    btn.textContent=email?'Personalized brief activated':'Enter your email';
+    if(email) btn.disabled=true;
+    return;
+  }
+  step=Math.max(1,Math.min(3,step+direction));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',Number(p.dataset.step)===step));
+  document.getElementById('stepLabel').textContent=`Step ${step} of 3`;
+  document.getElementById('progressBar').style.width=`${step/3*100}%`;
+  document.getElementById('backBtn').disabled=step===1;
+  const next=document.getElementById('nextBtn');
+  next.disabled=false;
+  next.textContent=step===3?'Activate personalized brief':'Continue';
+  if(step===3){
+    document.getElementById('sumMarket').textContent=document.getElementById('market').value;
+    document.getElementById('sumStyle').textContent=document.getElementById('style').value;
+    document.getElementById('sumExperience').textContent=document.getElementById('experience').value;
+  }
+}
+</script>
+</body>
+</html>
