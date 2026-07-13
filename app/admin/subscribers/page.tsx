@@ -82,7 +82,7 @@ export default function SubscriberAdminPage() {
   };
 
   return <main className="setupPage">
-    <nav className="setupNav shell"><Link className="brand" href="/">Morning Ledger<span>.</span></Link><div className="adminNavLinks"><Link href="/admin/catalogue">Catalogue</Link><button type="button" onClick={logout}>Sign out</button><Link className="closeSetup" href="/" aria-label="Close subscriber admin and return home"><span>Close</span><b aria-hidden="true">×</b></Link></div></nav>
+    <nav className="setupNav shell"><Link className="brand" href="/">Morning Ledger<span>.</span></Link><div className="adminNavLinks"><Link href="/admin/catalogue">Catalogue</Link><button type="button" onClick={logout}>Sign out</button><Link className="closeSetup" href="/" aria-label="Close subscriber admin and return home"><span>Close</span><b aria-hidden="true" /></Link></div></nav>
     <section className="adminSubscribers shell">
       <header className="adminHeader"><div><p className="kicker">Administration</p><h1>Subscribers.</h1><p>Manage profiles, notification subscriptions, and account status.</p></div><button type="button" className="nextButton" onClick={beginCreate}>New subscriber</button></header>
       <div className="adminToolbar"><input aria-label="Search subscribers" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search email or name" /><select aria-label="Filter subscriber status" value={activeFilter} onChange={event => setActiveFilter(event.target.value)}><option value="">All statuses</option><option value="true">Active</option><option value="false">Inactive</option></select><button type="button" onClick={() => load(1)}>Search</button></div>

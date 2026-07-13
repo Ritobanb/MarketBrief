@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FIXED_NOTIFICATION_SCHEDULES } from "../lib/briefing";
+import { BRIEFING_TIME_ZONE, FIXED_NOTIFICATION_SCHEDULES, isEasternBriefSchedule } from "../lib/briefing";
 import { createDefaultNotifications, DEFAULT_PREFERENCES, hasEnabledNotification, togglePreference, updateSelection } from "../lib/preferences";
 import { renderPersonalizedBrief } from "../services/briefing/render";
 
@@ -46,6 +46,14 @@ describe("updateSelection", () => {
     expect(FIXED_NOTIFICATION_SCHEDULES).toMatchObject({
       daily: { time: "07:00" }, premarket: { time: "08:00" }, close: { time: "16:30" }, weekly: { time: "18:00" },
     });
+  });
+
+  it("allows brief generation only at the fixed Eastern Time schedules", () => {
+    expect(BRIEFING_TIME_ZONE).toBe("America/New_York");
+    expect(isEasternBriefSchedule("daily", new Date("2026-07-13T11:00:00.000Z"))).toBe(true);
+    expect(isEasternBriefSchedule("daily", new Date("2026-07-13T10:59:00.000Z"))).toBe(false);
+    expect(isEasternBriefSchedule("daily", new Date("2026-07-12T11:00:00.000Z"))).toBe(false);
+    expect(isEasternBriefSchedule("weekly", new Date("2026-07-12T22:00:00.000Z"))).toBe(true);
   });
 
   it("renders personalization without another generation call", () => {

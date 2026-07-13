@@ -12,6 +12,7 @@
   {"symbol":"ENB","name":"Enbridge Inc.","exchange":"TSX","country":"CA","assetType":"Stock","currency":"CAD","isActive":true,"providerSymbol":"TSX:ENB"},
   {"symbol":"CNR","name":"Canadian National Railway Company","exchange":"TSX","country":"CA","assetType":"Stock","currency":"CAD","isActive":true,"providerSymbol":"TSX:CNR"},
   {"symbol":"VFV","name":"Vanguard S&P 500 Index ETF","exchange":"TSX","country":"CA","assetType":"ETF","currency":"CAD","isActive":true,"providerSymbol":"TSX:VFV"},
+  {"symbol":"VEQT","name":"Vanguard All-Equity ETF Portfolio","exchange":"TSX","country":"CA","assetType":"ETF","currency":"CAD","isActive":true,"providerSymbol":"TSX:VEQT"},
   {"symbol":"XEQT","name":"iShares Core Equity ETF Portfolio","exchange":"TSX","country":"CA","assetType":"ETF","currency":"CAD","isActive":true,"providerSymbol":"TSX:XEQT"},
   {"symbol":"QQQ","name":"Invesco QQQ Trust","exchange":"NASDAQ","country":"US","assetType":"ETF","currency":"USD","isActive":true,"providerSymbol":"NASDAQ:QQQ"},
   {"symbol":"SPY","name":"SPDR S&P 500 ETF Trust","exchange":"NYSE ARCA","country":"US","assetType":"ETF","currency":"USD","isActive":true,"providerSymbol":"NYSEARCA:SPY"},

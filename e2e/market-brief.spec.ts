@@ -39,7 +39,7 @@ test("homepage signup and sample brief work", async ({ page }) => {
   expect(ctaBox).not.toBeNull();
   expect(ctaBox!.y + ctaBox!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
   await page.getByLabel("Work email").fill("reader@example.com");
-  await page.getByRole("button", { name: /get the daily brief/i }).click();
+  await page.getByRole("button", { name: /get your daily brief/i }).click();
   await expect(page.getByRole("button", { name: /on the list/i })).toBeDisabled();
   await expect(page.getByLabel("Sample daily market brief")).toBeVisible();
   if ((page.viewportSize()?.width || 0) > 1100) {
@@ -112,6 +112,7 @@ test("setup exposes defaults, toggles, and a final summary", async ({ page }) =>
   await expect(page.getByRole("switch", { name: "Premarket Brief notification" })).toHaveAttribute("aria-checked", "false");
   await expect(page.getByRole("switch", { name: "Market Close Summary notification" })).toHaveAttribute("aria-checked", "false");
   await expect(page.getByLabel("Time zone")).toHaveValue("America/Toronto");
+  await expect(page.getByLabel("Time zone").locator("option")).toHaveText(["America/Toronto", "America/New_York"]);
   await expectWizardActionInViewport(page, /continue/i);
   await expectPageDesignIsHealthy(page);
   await expect(page.getByTestId("notification-options")).toHaveScreenshot("notification-options.png", { animations: "disabled" });
@@ -120,7 +121,7 @@ test("setup exposes defaults, toggles, and a final summary", async ({ page }) =>
     expect(fields).toHaveLength(3);
   });
   await expect(page.getByLabel("Premarket Brief delivery time")).toHaveText("8:00 AM");
-  await page.getByLabel("Time zone").selectOption("America/Vancouver");
+  await page.getByLabel("Time zone").selectOption("America/New_York");
   await page.getByRole("switch", { name: "Weekly Market Recap notification" }).click();
   await page.getByRole("button", { name: /continue/i }).click();
   await expect(page.getByText("Canadian markets · US markets")).toBeVisible();
@@ -130,12 +131,12 @@ test("setup exposes defaults, toggles, and a final summary", async ({ page }) =>
   await expect(page.getByText("Daily Market Brief — 7:00 AM")).toBeVisible();
   await expect(page.getByText("Premarket Brief — 8:00 AM")).toBeVisible();
   await expect(page.getByText("Weekly Market Recap", { exact: true })).not.toBeVisible();
-  await expect(page.getByText("America/Vancouver", { exact: true })).toBeVisible();
+  await expect(page.getByText("America/New_York", { exact: true })).toBeVisible();
   await expectWizardActionInViewport(page, /finish setup/i);
   await page.getByRole("button", { name: /back/i }).click();
   await expect(page.getByRole("switch", { name: "Premarket Brief notification" })).toHaveAttribute("aria-checked", "true");
   await expect(page.getByLabel("Premarket Brief delivery time")).toHaveText("8:00 AM");
-  await expect(page.getByLabel("Time zone")).toHaveValue("America/Vancouver");
+  await expect(page.getByLabel("Time zone")).toHaveValue("America/New_York");
   await page.getByRole("button", { name: /continue/i }).click();
   await page.getByLabel("Email address Required").fill("personalized@example.com");
   await page.getByRole("button", { name: /finish setup/i }).click();
@@ -145,10 +146,10 @@ test("setup exposes defaults, toggles, and a final summary", async ({ page }) =>
 test("email fields validate and subscriptions persist", async ({ page, request }) => {
   await page.goto("/");
   await page.getByLabel("Work email").fill("not-an-email");
-  await page.getByRole("button", { name: /get the daily brief/i }).click();
+  await page.getByRole("button", { name: /get your daily brief/i }).click();
   await expect(page.getByText("Enter a valid email address.")).toBeVisible();
   await page.getByLabel("Work email").fill("saved-reader@example.com");
-  await page.getByRole("button", { name: /get the daily brief/i }).click();
+  await page.getByRole("button", { name: /get your daily brief/i }).click();
   await expect(page.getByText("weekday brief preferences are saved")).toBeVisible();
 
   const invalid = await request.post("/api/subscriptions", { data: { email: "bad" } });

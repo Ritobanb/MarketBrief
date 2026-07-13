@@ -5,7 +5,10 @@ export const MARKET_OPTIONS = ["Canadian markets", "US markets", "European marke
 export const STYLE_OPTIONS = ["Balanced", "Long-term investor", "Active investor", "Day trader"] as const;
 export const EXPERIENCE_OPTIONS = ["Beginner-friendly", "Intermediate", "Advanced"] as const;
 export const CONTENT_OPTIONS = ["General market overview", "Top market-moving news", "ETF ideas to watch", "Day-trading opportunities"] as const;
-export const TIME_ZONE_OPTIONS = ["America/Toronto", "America/Vancouver", "America/New_York", "Europe/London", "Asia/Tokyo"] as const;
+// Keep the free-edition dropdown intentionally small. The broader validation
+// list preserves existing profiles and makes it easy to expose more zones later.
+export const TIME_ZONE_OPTIONS = ["America/Toronto", "America/New_York"] as const;
+export const SUPPORTED_TIME_ZONES = [...TIME_ZONE_OPTIONS, "America/Vancouver", "Europe/London", "Asia/Tokyo"] as const;
 
 export type SubscriptionInput = {
   source: "homepage" | "personalized";
@@ -52,7 +55,7 @@ export function validateSubscriptionInput(value: unknown): ValidationResult {
   const experienceLevel = typeof input.experienceLevel === "string" && EXPERIENCE_OPTIONS.some(option => option === input.experienceLevel) ? input.experienceLevel : "";
   if (!experienceLevel) errors.experienceLevel = "Choose an experience level.";
   const contentToggles = stringArray(input.contentToggles, CONTENT_OPTIONS, CONTENT_OPTIONS.length);
-  const timeZone = typeof input.timeZone === "string" && TIME_ZONE_OPTIONS.some(option => option === input.timeZone) ? input.timeZone : "";
+  const timeZone = typeof input.timeZone === "string" && SUPPORTED_TIME_ZONES.some(option => option === input.timeZone) ? input.timeZone : "";
   if (!timeZone) errors.timeZone = "Choose a supported time zone.";
   const watchlistInstrumentIds = Array.isArray(input.watchlistInstrumentIds)
     ? [...new Set(input.watchlistInstrumentIds.filter((item): item is string => typeof item === "string" && /^[\w:-]{1,120}$/.test(item)))].slice(0, 50)

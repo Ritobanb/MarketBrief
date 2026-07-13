@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "../../generated/prisma/client";
 import { Prisma } from "../../generated/prisma/client";
-import { CYCLE_TYPES, FIXED_NOTIFICATION_SCHEDULES, type CycleType, type MarketSnapshotPayload, type MasterBriefContent, type SnapshotInstrument } from "../../lib/briefing";
+import { BRIEFING_TIME_ZONE, CYCLE_TYPES, FIXED_NOTIFICATION_SCHEDULES, isEasternBriefSchedule, type CycleType, type MarketSnapshotPayload, type MasterBriefContent, type SnapshotInstrument } from "../../lib/briefing";
 import type { BriefGenerationAdapter, MarketDataAdapter } from "./adapters";
 import { renderPersonalizedBrief } from "./render";
 
@@ -73,6 +73,9 @@ export class BriefCycleRunner {
 
   async run(cycleType: CycleType, scheduledFor: Date) {
     if (!CYCLE_TYPES.includes(cycleType) || Number.isNaN(scheduledFor.valueOf())) throw new Error("Invalid brief cycle schedule.");
+    if (!isEasternBriefSchedule(cycleType, scheduledFor)) {
+      throw new Error(`Brief generation is restricted to the fixed ${BRIEFING_TIME_ZONE} schedule.`);
+    }
 
     const cycle = await this.prisma.briefCycle.upsert({
       where: { cycleType_scheduledFor: { cycleType, scheduledFor } },

@@ -52,7 +52,17 @@ function toInstrument(record: InstrumentRecord): Instrument {
   };
 }
 
+function configuredInstrumentTable() {
+  const schema = process.env.DATABASE_URL
+    ? new URL(process.env.DATABASE_URL).searchParams.get("schema") || "public"
+    : "public";
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(schema)) throw new Error("DATABASE_URL contains an invalid PostgreSQL schema name.");
+  return Prisma.raw(`"${schema}"."instruments"`);
+}
+
 export class CatalogueStore {
+  private readonly instrumentTable = configuredInstrumentTable();
+
   constructor(readonly prisma: PrismaClient = getPrisma()) {}
 
   async close() {
@@ -78,7 +88,7 @@ export class CatalogueStore {
       SELECT
         "stableInstrumentId", "symbol", "name", "exchange", "country",
         "assetType", "currency", "isActive", "providerSymbol", "updatedAt"
-      FROM "instruments"
+      FROM ${this.instrumentTable}
       WHERE "isActive" = true AND (
         "normalizedSymbol" LIKE ${contains} OR
         "normalizedName" LIKE ${contains} OR
@@ -170,17 +180,17 @@ export class CatalogueStore {
             stage."symbol", stage."name", stage."exchange", stage."country",
             stage."assetType", stage."currency", stage."isActive"
           )) AS updated,
-          (SELECT count(*) FROM "instruments" current
+          (SELECT count(*) FROM ${this.instrumentTable} current
             WHERE current."isActive" = true AND NOT EXISTS (
               SELECT 1 FROM "instrument_refresh_stage" incoming
               WHERE incoming."providerSymbol" = current."providerSymbol"
             )) AS deactivated
         FROM "instrument_refresh_stage" stage
-        LEFT JOIN "instruments" target ON target."providerSymbol" = stage."providerSymbol"
+        LEFT JOIN ${this.instrumentTable} target ON target."providerSymbol" = stage."providerSymbol"
       `;
 
       await transaction.$executeRaw`
-        INSERT INTO "instruments" (
+        INSERT INTO ${this.instrumentTable} (
           "stableInstrumentId", "symbol", "normalizedSymbol", "name", "normalizedName",
           "exchange", "country", "assetType", "currency", "providerSymbol", "isActive", "lastProviderSyncAt"
         )
@@ -200,10 +210,17 @@ export class CatalogueStore {
           "isActive" = EXCLUDED."isActive",
           "updatedAt" = CURRENT_TIMESTAMP,
           "lastProviderSyncAt" = EXCLUDED."lastProviderSyncAt"
+        WHERE (
+          "instruments"."symbol", "instruments"."normalizedSymbol", "instruments"."name", "instruments"."normalizedName",
+          "instruments"."exchange", "instruments"."country", "instruments"."assetType", "instruments"."currency", "instruments"."isActive"
+        ) IS DISTINCT FROM (
+          EXCLUDED."symbol", EXCLUDED."normalizedSymbol", EXCLUDED."name", EXCLUDED."normalizedName",
+          EXCLUDED."exchange", EXCLUDED."country", EXCLUDED."assetType", EXCLUDED."currency", EXCLUDED."isActive"
+        )
       `;
 
       await transaction.$executeRaw`
-        UPDATE "instruments" current
+        UPDATE ${this.instrumentTable} current
         SET "isActive" = false, "updatedAt" = CURRENT_TIMESTAMP, "lastProviderSyncAt" = ${refreshedAt}
         WHERE current."isActive" = true AND NOT EXISTS (
           SELECT 1 FROM "instrument_refresh_stage" incoming

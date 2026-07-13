@@ -10,6 +10,27 @@ export const FIXED_NOTIFICATION_SCHEDULES: Record<CycleType, { time: string; lab
   weekly: { time: "18:00", label: "6:00 PM", cadence: "Sunday evening" },
 };
 
+export const BRIEFING_TIME_ZONE = "America/New_York";
+
+const WEEKDAY_CYCLES = new Set<CycleType>(["daily", "premarket", "close"]);
+
+/** Ensures costly generation can only start at the fixed Eastern Time schedule. */
+export function isEasternBriefSchedule(cycleType: CycleType, scheduledFor: Date) {
+  if (Number.isNaN(scheduledFor.valueOf())) return false;
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
+    timeZone: BRIEFING_TIME_ZONE,
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(scheduledFor).map(part => [part.type, part.value]));
+  const [expectedHour, expectedMinute] = FIXED_NOTIFICATION_SCHEDULES[cycleType].time.split(":");
+  const correctDay = cycleType === "weekly"
+    ? parts.weekday === "Sun"
+    : !WEEKDAY_CYCLES.has(cycleType) || !["Sat", "Sun"].includes(parts.weekday);
+  return correctDay && parts.hour === expectedHour && parts.minute === expectedMinute;
+}
+
 export type SnapshotInstrument = {
   stableInstrumentId: string;
   symbol: string;

@@ -41,12 +41,12 @@ export default function Home() {
         </aside>
         <div className="eyebrow"><span className="liveDot" /> Weekdays · 7:00 AM</div>
         <h1>The market, made<br />clear before coffee.</h1>
-        <p className="heroCopy">A concise daily read on what moved, why it matters, and what to watch next. No noise. No hot takes.</p>
+        <p className="heroCopy">Your markets, your watchlist, one simple daily brief. Clear context without the noise.</p>
 
         <form className="signup" onSubmit={handleSignup} data-testid="signup-form" noValidate>
           <label className="srOnly" htmlFor="email">Work email</label>
           <input id="email" name="email" type="email" inputMode="email" autoComplete="email" maxLength={254} aria-invalid={Boolean(signupError)} aria-describedby="signup-status" placeholder="you@company.com" onChange={() => setSignupError("")} required />
-          <button type="submit" disabled={signupComplete || submitting}>{signupComplete ? "You’re on the list ✓" : submitting ? "Saving…" : <>Get the daily brief <span aria-hidden="true">→</span></>}</button>
+          <button type="submit" disabled={signupComplete || submitting}>{signupComplete ? "You’re on the list ✓" : submitting ? "Saving…" : <>Get your daily brief <span aria-hidden="true">→</span></>}</button>
         </form>
         <p id="signup-status" className={signupError ? "finePrint validationError" : "finePrint"} role={signupError ? "alert" : "status"}>{signupError || (signupComplete ? "Thanks — your weekday brief preferences are saved." : "Free weekday delivery. Unsubscribe anytime.")}</p>
         <div className="heroPersonalize" aria-label="Personalized market brief">

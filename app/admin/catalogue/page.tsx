@@ -27,7 +27,7 @@ export default function CatalogueAdminPage() {
   };
 
   return <main className="setupPage">
-    <nav className="setupNav shell"><Link className="brand" href="/">Morning Ledger<span>.</span></Link><div className="adminNavLinks"><Link href="/admin/subscribers">Subscribers</Link><button type="button" onClick={logout}>Sign out</button><Link className="closeSetup" href="/" aria-label="Close catalogue admin and return home"><span>Close</span><b aria-hidden="true">×</b></Link></div></nav>
+    <nav className="setupNav shell"><Link className="brand" href="/">Morning Ledger<span>.</span></Link><div className="adminNavLinks"><Link href="/admin/subscribers">Subscribers</Link><button type="button" onClick={logout}>Sign out</button><Link className="closeSetup" href="/" aria-label="Close catalogue admin and return home"><span>Close</span><b aria-hidden="true" /></Link></div></nav>
     <section className="setupWrap adminCatalogue">
       <p className="kicker">Catalogue admin</p><h1>Instrument refresh status.</h1>
       <p className="setupLead">The application searches this local catalogue. The free provider adapter refreshes it once per day.</p>

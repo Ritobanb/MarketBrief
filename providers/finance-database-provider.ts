@@ -2,7 +2,7 @@ import type { ProviderInstrument } from "../lib/instruments";
 import { parseCsv } from "./csv";
 import { InstrumentProvider, uniqueInstruments } from "./instrument-provider";
 
-const BASE_URL = "https://raw.githubusercontent.com/JerBouma/FinanceDatabase/main/database/equities";
+const RAW_DATABASE_URL = "https://raw.githubusercontent.com/JerBouma/FinanceDatabase/main/database";
 
 export type MarketConfig = {
   file: "TOR" | "LSE" | "ASX" | "NSE" | "NSI";
@@ -25,7 +25,7 @@ function normalizeCurrency(value: string, fallback: MarketConfig["currency"]) {
   return /^[A-Z]{3}$/.test(currency) ? currency : fallback;
 }
 
-export function parseFinanceDatabaseEquities(text: string, market: MarketConfig): ProviderInstrument[] {
+function parseFinanceDatabaseFile(text: string, market: MarketConfig, assetType: ProviderInstrument["assetType"]): ProviderInstrument[] {
   const instruments: ProviderInstrument[] = [];
   for (const row of parseCsv(text)) {
     const rawSymbol = row.symbol?.trim();
@@ -38,7 +38,7 @@ export function parseFinanceDatabaseEquities(text: string, market: MarketConfig)
       name,
       exchange: market.exchange,
       country: market.country,
-      assetType: "Stock" as const,
+      assetType,
       currency: normalizeCurrency(row.currency || "", market.currency),
       isActive: row.delisted?.trim().toLowerCase() !== "true",
       providerSymbol: `${market.exchange}:${symbol}`,
@@ -47,13 +47,22 @@ export function parseFinanceDatabaseEquities(text: string, market: MarketConfig)
   return instruments;
 }
 
-async function downloadMarket(market: MarketConfig) {
-  const response = await fetch(`${BASE_URL}/${market.file}.csv`, {
+export function parseFinanceDatabaseEquities(text: string, market: MarketConfig): ProviderInstrument[] {
+  return parseFinanceDatabaseFile(text, market, "Stock");
+}
+
+export function parseFinanceDatabaseEtfs(text: string, market: MarketConfig): ProviderInstrument[] {
+  return parseFinanceDatabaseFile(text, market, "ETF");
+}
+
+async function downloadMarket(market: MarketConfig, collection: "equities" | "etfs" = "equities") {
+  const response = await fetch(`${RAW_DATABASE_URL}/${collection}/${market.file}.csv`, {
     headers: { "User-Agent": "MorningLedger-Catalogue/1.0" },
     signal: AbortSignal.timeout(60_000),
   });
   if (!response.ok) throw new Error(`Global catalogue download for ${market.file} failed with HTTP ${response.status}.`);
-  return parseFinanceDatabaseEquities(await response.text(), market);
+  const text = await response.text();
+  return collection === "etfs" ? parseFinanceDatabaseEtfs(text, market) : parseFinanceDatabaseEquities(text, market);
 }
 
 export class FinanceDatabaseProvider implements InstrumentProvider {
@@ -61,7 +70,12 @@ export class FinanceDatabaseProvider implements InstrumentProvider {
   readonly minimumExpectedRecords = 5_000;
 
   async fetchCatalogue(): Promise<ProviderInstrument[]> {
-    const marketRecords = await Promise.all(MARKETS.map(downloadMarket));
-    return uniqueInstruments(marketRecords.flat());
+    const canadianMarket = MARKETS.find(market => market.exchange === "TSX")!;
+    const [canadianEtfs, ...equityMarkets] = await Promise.all([
+      downloadMarket(canadianMarket, "etfs"),
+      ...MARKETS.map(market => downloadMarket(market, "equities")),
+    ]);
+    // ETF metadata wins if an upstream file also classifies the listing as equity.
+    return uniqueInstruments([...canadianEtfs, ...equityMarkets.flat()]);
   }
 }

@@ -6,7 +6,7 @@ import { InstrumentSearch } from "./InstrumentSearch";
 import { createDefaultNotifications, DEFAULT_PREFERENCES, hasEnabledNotification, NOTIFICATION_OPTIONS, NotificationPreference, togglePreference } from "../../lib/preferences";
 import { Instrument } from "../../lib/instruments";
 import { FIXED_NOTIFICATION_SCHEDULES } from "../../lib/briefing";
-import { isValidEmail } from "../../lib/subscriptions";
+import { isValidEmail, TIME_ZONE_OPTIONS } from "../../lib/subscriptions";
 
 const marketOptions = ["Canadian markets", "US markets", "European markets", "Asia-Pacific markets"];
 const contentOptions = [
@@ -68,7 +68,7 @@ export default function SetupPage() {
   return <main className="setupPage">
     <nav className="setupNav shell">
       <Link className="brand" href="/">Morning Ledger<span>.</span></Link>
-      <Link className="closeSetup" href="/" aria-label="Close personalization setup and return home"><span>Close</span><b aria-hidden="true">×</b></Link>
+      <Link className="closeSetup" href="/" aria-label="Close personalization setup and return home"><span>Close</span><b aria-hidden="true" /></Link>
     </nav>
     <section className="setupWrap">
       {!complete ? <>
@@ -115,7 +115,7 @@ export default function SetupPage() {
               </div>;
             })}
           </div>
-          <label className="setupField timeZoneField"><span>Time zone</span><select value={timeZone} onChange={event => setTimeZone(event.target.value)}><option>America/Toronto</option><option>America/Vancouver</option><option>America/New_York</option><option>Europe/London</option><option>Asia/Tokyo</option></select></label>
+          <label className="setupField timeZoneField"><span>Time zone</span><select value={timeZone} onChange={event => setTimeZone(event.target.value)}>{TIME_ZONE_OPTIONS.map(option => <option key={option}>{option}</option>)}</select></label>
           {notificationError && <p className="validationError" role="alert">{notificationError}</p>}
         </>}
 

@@ -38,7 +38,7 @@ Passwords use salted scrypt hashes. Successful login creates an eight-hour, HTTP
 - Prisma schema: `prisma/schema.prisma`
 - PostgreSQL migration: `prisma/migrations/20260712000000_postgresql_catalogue/migration.sql`
 - Local PostgreSQL: `docker-compose.yml`
-- Free daily providers: Nasdaq Trader for US listings and FinanceDatabase exchange files for TSX, LSE, ASX, and NSE
+- Free daily providers: Nasdaq Trader for US listings and FinanceDatabase exchange files for TSX stocks and ETFs, plus LSE, ASX, and NSE stocks
 - Offline mock provider: `providers/mock-provider.ts`
 - Mock symbol list: `data/mock-instruments.json`
 - Local search: `GET /api/instruments/search?q=nvda`
@@ -76,6 +76,8 @@ pnpm db:import:sqlite data/instruments.db
 The importer detects duplicate provider symbols or stable IDs, preserves every existing stable instrument ID, and verifies imported records before reporting success. It never deletes the SQLite file.
 
 ## Validation
+
+Integration and Playwright tests can write or replace records. Both refuse to start unless `DATABASE_URL` names a dedicated database or schema containing `test`, and Playwright always starts its own isolated server on port 3100 instead of reusing the development app. Never point tests at development or production data. For local runs, use `DATABASE_URL="$TEST_DATABASE_URL" pnpm test:integration` or `DATABASE_URL="$TEST_DATABASE_URL" pnpm test:e2e`.
 
 ```bash
 pnpm lint

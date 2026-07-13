@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createHomepageSubscription, isValidEmail, validateSubscriptionInput } from "../lib/subscriptions";
+import { createHomepageSubscription, isValidEmail, TIME_ZONE_OPTIONS, validateSubscriptionInput } from "../lib/subscriptions";
 
 describe("subscription validation", () => {
   it("normalizes a valid homepage email", () => {
@@ -20,5 +20,9 @@ describe("subscription validation", () => {
     const result = validateSubscriptionInput({ ...input, markets: [], notifications: {} });
     expect(result.success).toBe(false);
     if (!result.success) expect(result.errors).toMatchObject({ markets: expect.any(String), notifications: expect.any(String) });
+  });
+
+  it("shows only Toronto and New York in the free-edition timezone dropdown", () => {
+    expect(TIME_ZONE_OPTIONS).toEqual(["America/Toronto", "America/New_York"]);
   });
 });

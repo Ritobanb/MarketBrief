@@ -6,7 +6,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { CATALOGUE_REFRESH_LOCK_ID, CatalogueStore, RefreshInProgressError } from "../../db/catalogue";
 import { createPrismaClient } from "../../db/prisma";
 import type { ProviderInstrument } from "../../lib/instruments";
-import { parseFinanceDatabaseEquities } from "../../providers/finance-database-provider";
+import { parseFinanceDatabaseEquities, parseFinanceDatabaseEtfs } from "../../providers/finance-database-provider";
 import type { MarketConfig } from "../../providers/finance-database-provider";
 import type { InstrumentProvider } from "../../providers/instrument-provider";
 import { parseNasdaqListed, parseOtherListed } from "../../providers/nasdaq-trader-provider";
@@ -16,6 +16,7 @@ import { BriefCycleRunner } from "../../services/briefing/cycle-runner";
 import { MockBriefGenerationAdapter, MockMarketDataAdapter } from "../../services/briefing/mock-adapters";
 import { saveSubscription } from "../../services/subscriptions";
 import { createHomepageSubscription } from "../../lib/subscriptions";
+import { requireIsolatedTestDatabase } from "../helpers/test-database";
 
 const initial: ProviderInstrument[] = [
   { symbol: "NVDA", name: "NVIDIA Corporation", exchange: "NASDAQ", country: "US", assetType: "Stock", currency: "USD", isActive: true, providerSymbol: "NASDAQ:NVDA" },
@@ -24,6 +25,8 @@ const initial: ProviderInstrument[] = [
   { symbol: "VFV", name: "Vanguard S&P 500 Index ETF", exchange: "TSX", country: "CA", assetType: "ETF", currency: "CAD", isActive: true, providerSymbol: "TSX:VFV" },
   { symbol: "OLD", name: "Inactive Company", exchange: "TSX", country: "CA", assetType: "Stock", currency: "CAD", isActive: false, providerSymbol: "TSX:OLD" },
 ];
+
+const integrationDatabaseUrl = requireIsolatedTestDatabase();
 
 class FixtureProvider implements InstrumentProvider {
   readonly name = "fixture";
@@ -35,7 +38,7 @@ class FixtureProvider implements InstrumentProvider {
   }
 }
 
-const prisma = createPrismaClient();
+const prisma = createPrismaClient(integrationDatabaseUrl);
 const store = new CatalogueStore(prisma);
 
 describe("PostgreSQL instrument catalogue", () => {
@@ -198,6 +201,11 @@ describe("PostgreSQL instrument catalogue", () => {
     for (const [market, symbol, providerSymbol] of mappings) {
       expect(parseFinanceDatabaseEquities(`symbol,name,currency,delisted\n${symbol},Example,,False\n`, market)[0]).toMatchObject({ exchange: market.exchange, country: market.country, providerSymbol });
     }
+    const tsx = mappings[0][0];
+    expect(parseFinanceDatabaseEtfs("symbol,name,currency\nVEQT.TO,Vanguard All-Equity ETF Portfolio,CAD\nXEQT.TO,iShares Core Equity ETF Portfolio,CAD\n", tsx)).toMatchObject([
+      { symbol: "VEQT", exchange: "TSX", assetType: "ETF", providerSymbol: "TSX:VEQT" },
+      { symbol: "XEQT", exchange: "TSX", assetType: "ETF", providerSymbol: "TSX:XEQT" },
+    ]);
   });
 
   it("uses one generation call to create personalized deliveries for a cycle", async () => {
@@ -249,5 +257,17 @@ describe("PostgreSQL instrument catalogue", () => {
     await expect(runner.run("daily", scheduledFor)).rejects.toThrow(/already running|single generation call/i);
     expect(calls).toBe(1);
     expect((await prisma.briefCycle.findFirstOrThrow({ where: { scheduledFor } })).llmCallCount).toBe(1);
+  });
+
+  it("rejects off-schedule runs before an LLM call", async () => {
+    let calls = 0;
+    const generator = {
+      model: "schedule-test-model", promptVersion: "test-v1",
+      async generate() { calls += 1; throw new Error("must not run"); },
+    };
+    const runner = new BriefCycleRunner(prisma, new MockMarketDataAdapter(), generator);
+    await expect(runner.run("daily", new Date("2026-07-13T12:00:00.000Z"))).rejects.toThrow(/fixed America\/New_York schedule/);
+    expect(calls).toBe(0);
+    expect(await prisma.briefCycle.count()).toBe(0);
   });
 });
