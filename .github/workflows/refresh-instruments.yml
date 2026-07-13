@@ -9,7 +9,7 @@ jobs:
   refresh:
     runs-on: ubuntu-latest
     steps:
-      - name: Refresh the deployed local catalogue
+      - name: Refresh the deployed catalogue
         env:
           REFRESH_URL: ${{ secrets.CATALOGUE_REFRESH_URL }}
           REFRESH_SECRET: ${{ secrets.CATALOGUE_REFRESH_SECRET }}

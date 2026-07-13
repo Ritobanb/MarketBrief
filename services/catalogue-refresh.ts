@@ -1,5 +1,5 @@
 import { ASSET_TYPES, ProviderInstrument } from "../lib/instruments";
-import { CatalogueStore } from "../db/catalogue";
+import { CatalogueStore, RefreshInProgressError } from "../db/catalogue";
 import { InstrumentProvider } from "../providers/instrument-provider";
 
 export function validateCatalogue(records: ProviderInstrument[], minimumRecords: number) {
@@ -16,14 +16,16 @@ export function validateCatalogue(records: ProviderInstrument[], minimumRecords:
 }
 
 export async function refreshCatalogue(store: CatalogueStore, provider: InstrumentProvider) {
-  const attemptedAt = new Date().toISOString();
+  const attemptedAt = new Date();
   try {
     const records = await provider.fetchCatalogue();
     validateCatalogue(records, provider.minimumExpectedRecords);
-    store.replaceFromProvider(records, attemptedAt);
-    return store.getStatus();
+    await store.replaceFromProvider(records, attemptedAt);
+    return await store.getStatus();
   } catch (error) {
-    store.recordFailure(error instanceof Error ? error.message : "Unknown catalogue refresh error", attemptedAt);
+    if (!(error instanceof RefreshInProgressError)) {
+      await store.recordFailure(error instanceof Error ? error.message : "Unknown catalogue refresh error", attemptedAt);
+    }
     throw error;
   }
 }

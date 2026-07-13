@@ -1,116 +1,240 @@
 import { randomUUID } from "node:crypto";
-import { mkdirSync } from "node:fs";
-import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
-import { CatalogueRefreshStatus, Instrument, ProviderInstrument } from "../lib/instruments";
-import { migrationStatements } from "./schema";
+import type { PrismaClient } from "../generated/prisma/client";
+import { Prisma } from "../generated/prisma/client";
+import type { CatalogueRefreshStatus, Instrument, ProviderInstrument } from "../lib/instruments";
+import { getPrisma } from "./prisma";
 
-type InstrumentRow = {
-  instrument_id: string; symbol: string; name: string; exchange: string; country: string;
-  asset_type: string; currency: string; is_active: number; provider_symbol: string; last_updated_at: string;
+export const CATALOGUE_REFRESH_LOCK_ID = 4_621_337_701;
+const INSERT_BATCH_SIZE = 500;
+
+type InstrumentRecord = {
+  stableInstrumentId: string;
+  symbol: string;
+  name: string;
+  exchange: string;
+  country: string;
+  assetType: string;
+  currency: string;
+  isActive: boolean;
+  providerSymbol: string;
+  updatedAt: Date;
 };
 
-function toInstrument(row: InstrumentRow): Instrument {
+type RefreshCounts = {
+  added: bigint;
+  updated: bigint;
+  deactivated: bigint;
+};
+
+export class RefreshInProgressError extends Error {
+  constructor() {
+    super("An instrument catalogue refresh is already running.");
+    this.name = "RefreshInProgressError";
+  }
+}
+
+export function normalizeSearchText(value: string) {
+  return value.trim().toLocaleLowerCase("en-US");
+}
+
+function toInstrument(record: InstrumentRecord): Instrument {
   return {
-    instrumentId: row.instrument_id,
-    symbol: row.symbol,
-    name: row.name,
-    exchange: row.exchange,
-    country: row.country,
-    assetType: row.asset_type as Instrument["assetType"],
-    currency: row.currency,
-    isActive: row.is_active === 1,
-    providerSymbol: row.provider_symbol,
-    lastUpdatedAt: row.last_updated_at,
+    instrumentId: record.stableInstrumentId,
+    symbol: record.symbol,
+    name: record.name,
+    exchange: record.exchange,
+    country: record.country,
+    assetType: record.assetType as Instrument["assetType"],
+    currency: record.currency,
+    isActive: record.isActive,
+    providerSymbol: record.providerSymbol,
+    lastUpdatedAt: record.updatedAt.toISOString(),
   };
 }
 
 export class CatalogueStore {
-  readonly db: DatabaseSync;
+  constructor(readonly prisma: PrismaClient = getPrisma()) {}
 
-  constructor(databasePath: string) {
-    if (databasePath !== ":memory:") mkdirSync(path.dirname(databasePath), { recursive: true });
-    this.db = new DatabaseSync(databasePath);
-    this.db.exec("PRAGMA journal_mode = WAL");
-    this.db.exec("PRAGMA foreign_keys = ON");
-    for (const statement of migrationStatements) this.db.prepare(statement).run();
+  async close() {
+    await this.prisma.$disconnect();
   }
 
-  close() { this.db.close(); }
-
-  count() {
-    return Number((this.db.prepare("SELECT COUNT(*) AS count FROM instruments").get() as { count: number }).count);
+  async count() {
+    return this.prisma.instrument.count();
   }
 
-  all(): Instrument[] {
-    return (this.db.prepare("SELECT * FROM instruments ORDER BY provider_symbol").all() as InstrumentRow[]).map(toInstrument);
+  async all(): Promise<Instrument[]> {
+    const records = await this.prisma.instrument.findMany({ orderBy: { providerSymbol: "asc" } });
+    return records.map(toInstrument);
   }
 
-  search(query: string, limit = 15): Instrument[] {
-    const clean = query.trim().toLowerCase();
+  async search(query: string, limit = 15): Promise<Instrument[]> {
+    const clean = normalizeSearchText(query);
     if (!clean) return [];
-    const starts = `${clean}%`;
     const contains = `%${clean}%`;
+    const starts = `${clean}%`;
     const safeLimit = Math.min(20, Math.max(10, limit));
-    const rows = this.db.prepare(`
-      SELECT * FROM instruments
-      WHERE is_active = 1 AND (
-        lower(symbol) LIKE ? OR lower(name) LIKE ? OR lower(exchange) LIKE ? OR
-        lower(asset_type) LIKE ? OR lower(provider_symbol) LIKE ?
+    const records = await this.prisma.$queryRaw<InstrumentRecord[]>(Prisma.sql`
+      SELECT
+        "stableInstrumentId", "symbol", "name", "exchange", "country",
+        "assetType", "currency", "isActive", "providerSymbol", "updatedAt"
+      FROM "instruments"
+      WHERE "isActive" = true AND (
+        "normalizedSymbol" LIKE ${contains} OR
+        "normalizedName" LIKE ${contains} OR
+        lower("exchange") LIKE ${contains} OR
+        lower("assetType") LIKE ${contains} OR
+        lower("providerSymbol") LIKE ${contains}
       )
       ORDER BY
-        CASE WHEN lower(symbol) = ? THEN 0 WHEN lower(symbol) LIKE ? THEN 1 WHEN lower(name) LIKE ? THEN 2 ELSE 3 END,
-        symbol, exchange
-      LIMIT ?
-    `).all(contains, contains, contains, contains, contains, clean, starts, starts, safeLimit) as InstrumentRow[];
-    return rows.map(toInstrument);
+        CASE
+          WHEN "normalizedSymbol" = ${clean} THEN 0
+          WHEN "normalizedSymbol" LIKE ${starts} THEN 1
+          WHEN "normalizedName" LIKE ${contains} THEN 2
+          ELSE 3
+        END,
+        "symbol", "exchange"
+      LIMIT ${safeLimit}
+    `);
+    return records.map(toInstrument);
   }
 
-  getStatus(): CatalogueRefreshStatus {
-    const row = this.db.prepare("SELECT * FROM catalogue_refresh_status WHERE id = 1").get() as Record<string, string | null>;
-    const counts = this.db.prepare("SELECT SUM(is_active) AS active, SUM(CASE WHEN is_active = 0 THEN 1 ELSE 0 END) AS inactive FROM instruments").get() as { active: number | null; inactive: number | null };
+  async getStatus(): Promise<CatalogueRefreshStatus> {
+    const status = await this.prisma.catalogueRefreshStatus.findUnique({ where: { id: 1 } });
+    if (!status) {
+      return { status: "never", lastAttemptedAt: null, lastSuccessfulRefreshAt: null, lastError: null, activeCount: 0, inactiveCount: 0 };
+    }
     return {
-      status: (row.status || "never") as CatalogueRefreshStatus["status"],
-      lastAttemptedAt: row.last_attempted_at,
-      lastSuccessfulRefreshAt: row.last_successful_refresh_at,
-      lastError: row.last_error,
-      activeCount: Number(counts.active || 0),
-      inactiveCount: Number(counts.inactive || 0),
+      status: status.status as CatalogueRefreshStatus["status"],
+      lastAttemptedAt: status.lastAttemptedAt?.toISOString() || null,
+      lastSuccessfulRefreshAt: status.lastSuccessfulRefreshAt?.toISOString() || null,
+      lastError: status.lastError,
+      activeCount: status.activeCount,
+      inactiveCount: status.inactiveCount,
     };
   }
 
-  recordFailure(message: string, attemptedAt = new Date().toISOString()) {
-    this.db.prepare("UPDATE catalogue_refresh_status SET status = 'failed', last_attempted_at = ?, last_error = ? WHERE id = 1").run(attemptedAt, message);
+  async recordFailure(message: string, attemptedAt = new Date()) {
+    await this.prisma.catalogueRefreshStatus.upsert({
+      where: { id: 1 },
+      create: { id: 1, status: "failed", lastAttemptedAt: attemptedAt, lastError: message },
+      update: { status: "failed", lastAttemptedAt: attemptedAt, lastError: message },
+    });
   }
 
-  replaceFromProvider(records: ProviderInstrument[], refreshedAt = new Date().toISOString()) {
-    const existing = this.db.prepare("SELECT instrument_id FROM instruments WHERE provider_symbol = ?");
-    const insert = this.db.prepare(`INSERT INTO instruments
-      (instrument_id, symbol, name, exchange, country, asset_type, currency, is_active, provider_symbol, last_updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-    const update = this.db.prepare(`UPDATE instruments SET symbol = ?, name = ?, exchange = ?, country = ?, asset_type = ?, currency = ?, is_active = ?, last_updated_at = ? WHERE provider_symbol = ?`);
-    const seen = new Set(records.map(record => record.providerSymbol));
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      for (const record of records) {
-        const row = existing.get(record.providerSymbol) as { instrument_id: string } | undefined;
-        if (row) update.run(record.symbol, record.name, record.exchange, record.country, record.assetType, record.currency, record.isActive ? 1 : 0, refreshedAt, record.providerSymbol);
-        else insert.run(`inst_${randomUUID()}`, record.symbol, record.name, record.exchange, record.country, record.assetType, record.currency, record.isActive ? 1 : 0, record.providerSymbol, refreshedAt);
+  async replaceFromProvider(records: ProviderInstrument[], refreshedAt = new Date()) {
+    await this.prisma.$transaction(async transaction => {
+      const [lock] = await transaction.$queryRaw<Array<{ acquired: boolean }>>`
+        SELECT pg_try_advisory_xact_lock(${CATALOGUE_REFRESH_LOCK_ID}) AS acquired
+      `;
+      if (!lock?.acquired) throw new RefreshInProgressError();
+
+      await transaction.$executeRaw`
+        CREATE TEMPORARY TABLE "instrument_refresh_stage" (
+          "stableInstrumentId" TEXT NOT NULL,
+          "symbol" TEXT NOT NULL,
+          "normalizedSymbol" TEXT NOT NULL,
+          "name" TEXT NOT NULL,
+          "normalizedName" TEXT NOT NULL,
+          "exchange" TEXT NOT NULL,
+          "country" TEXT NOT NULL,
+          "assetType" TEXT NOT NULL,
+          "currency" TEXT NOT NULL,
+          "providerSymbol" TEXT PRIMARY KEY,
+          "isActive" BOOLEAN NOT NULL,
+          "lastProviderSyncAt" TIMESTAMPTZ NOT NULL
+        ) ON COMMIT DROP
+      `;
+
+      for (let index = 0; index < records.length; index += INSERT_BATCH_SIZE) {
+        const values = records.slice(index, index + INSERT_BATCH_SIZE).map(record => Prisma.sql`(
+          ${`inst_${randomUUID()}`}, ${record.symbol}, ${normalizeSearchText(record.symbol)},
+          ${record.name}, ${normalizeSearchText(record.name)}, ${record.exchange}, ${record.country},
+          ${record.assetType}, ${record.currency}, ${record.providerSymbol}, ${record.isActive}, ${refreshedAt}
+        )`);
+        await transaction.$executeRaw(Prisma.sql`
+          INSERT INTO "instrument_refresh_stage" (
+            "stableInstrumentId", "symbol", "normalizedSymbol", "name", "normalizedName",
+            "exchange", "country", "assetType", "currency", "providerSymbol", "isActive", "lastProviderSyncAt"
+          ) VALUES ${Prisma.join(values)}
+        `);
       }
-      const activeRows = this.db.prepare("SELECT provider_symbol FROM instruments WHERE is_active = 1").all() as Array<{ provider_symbol: string }>;
-      const deactivate = this.db.prepare("UPDATE instruments SET is_active = 0, last_updated_at = ? WHERE provider_symbol = ?");
-      for (const row of activeRows) if (!seen.has(row.provider_symbol)) deactivate.run(refreshedAt, row.provider_symbol);
-      this.db.prepare("UPDATE catalogue_refresh_status SET status = 'success', last_attempted_at = ?, last_successful_refresh_at = ?, last_error = NULL WHERE id = 1").run(refreshedAt, refreshedAt);
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
+
+      const [counts] = await transaction.$queryRaw<RefreshCounts[]>`
+        SELECT
+          count(*) FILTER (WHERE target."id" IS NULL) AS added,
+          count(*) FILTER (WHERE target."id" IS NOT NULL AND (
+            target."symbol", target."name", target."exchange", target."country",
+            target."assetType", target."currency", target."isActive"
+          ) IS DISTINCT FROM (
+            stage."symbol", stage."name", stage."exchange", stage."country",
+            stage."assetType", stage."currency", stage."isActive"
+          )) AS updated,
+          (SELECT count(*) FROM "instruments" current
+            WHERE current."isActive" = true AND NOT EXISTS (
+              SELECT 1 FROM "instrument_refresh_stage" incoming
+              WHERE incoming."providerSymbol" = current."providerSymbol"
+            )) AS deactivated
+        FROM "instrument_refresh_stage" stage
+        LEFT JOIN "instruments" target ON target."providerSymbol" = stage."providerSymbol"
+      `;
+
+      await transaction.$executeRaw`
+        INSERT INTO "instruments" (
+          "stableInstrumentId", "symbol", "normalizedSymbol", "name", "normalizedName",
+          "exchange", "country", "assetType", "currency", "providerSymbol", "isActive", "lastProviderSyncAt"
+        )
+        SELECT
+          "stableInstrumentId", "symbol", "normalizedSymbol", "name", "normalizedName",
+          "exchange", "country", "assetType", "currency", "providerSymbol", "isActive", "lastProviderSyncAt"
+        FROM "instrument_refresh_stage"
+        ON CONFLICT ("providerSymbol") DO UPDATE SET
+          "symbol" = EXCLUDED."symbol",
+          "normalizedSymbol" = EXCLUDED."normalizedSymbol",
+          "name" = EXCLUDED."name",
+          "normalizedName" = EXCLUDED."normalizedName",
+          "exchange" = EXCLUDED."exchange",
+          "country" = EXCLUDED."country",
+          "assetType" = EXCLUDED."assetType",
+          "currency" = EXCLUDED."currency",
+          "isActive" = EXCLUDED."isActive",
+          "updatedAt" = CURRENT_TIMESTAMP,
+          "lastProviderSyncAt" = EXCLUDED."lastProviderSyncAt"
+      `;
+
+      await transaction.$executeRaw`
+        UPDATE "instruments" current
+        SET "isActive" = false, "updatedAt" = CURRENT_TIMESTAMP, "lastProviderSyncAt" = ${refreshedAt}
+        WHERE current."isActive" = true AND NOT EXISTS (
+          SELECT 1 FROM "instrument_refresh_stage" incoming
+          WHERE incoming."providerSymbol" = current."providerSymbol"
+        )
+      `;
+
+      const [activeCount, inactiveCount] = await Promise.all([
+        transaction.instrument.count({ where: { isActive: true } }),
+        transaction.instrument.count({ where: { isActive: false } }),
+      ]);
+      await transaction.catalogueRefreshStatus.upsert({
+        where: { id: 1 },
+        create: {
+          id: 1, status: "success", lastAttemptedAt: refreshedAt, lastSuccessfulRefreshAt: refreshedAt,
+          activeCount, inactiveCount, recordsReceived: records.length, recordsAdded: Number(counts.added),
+          recordsUpdated: Number(counts.updated), recordsDeactivated: Number(counts.deactivated),
+        },
+        update: {
+          status: "success", lastAttemptedAt: refreshedAt, lastSuccessfulRefreshAt: refreshedAt, lastError: null,
+          activeCount, inactiveCount, recordsReceived: records.length, recordsAdded: Number(counts.added),
+          recordsUpdated: Number(counts.updated), recordsDeactivated: Number(counts.deactivated),
+        },
+      });
+    }, { maxWait: 10_000, timeout: 120_000 });
   }
 }
 
 let store: CatalogueStore | undefined;
+
 export function getCatalogueStore() {
-  store ??= new CatalogueStore(process.env.INSTRUMENT_DB_PATH || path.join(process.cwd(), "data", "instruments.db"));
+  store ??= new CatalogueStore();
   return store;
 }

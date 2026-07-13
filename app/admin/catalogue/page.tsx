@@ -3,16 +3,20 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { CatalogueRefreshStatus } from "../../../lib/instruments";
+import { useRouter } from "next/navigation";
 
 export default function CatalogueAdminPage() {
+  const router = useRouter();
   const [status, setStatus] = useState<CatalogueRefreshStatus | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     let active = true;
-    fetch("/api/admin/instruments/status").then(response => response.json()).then(data => { if (active) setStatus(data); });
+    fetch("/api/admin/instruments/status").then(response => { if (response.status === 401) { router.replace("/admin/login"); return null; } return response.json(); }).then(data => { if (active && data) setStatus(data); });
     return () => { active = false; };
-  }, []);
+  }, [router]);
+
+  const logout = async () => { await fetch("/api/admin/auth/logout", { method: "POST" }); router.replace("/admin/login"); };
 
   const refresh = async () => {
     setRefreshing(true);
@@ -23,7 +27,7 @@ export default function CatalogueAdminPage() {
   };
 
   return <main className="setupPage">
-    <nav className="setupNav shell"><Link className="brand" href="/">Morning Ledger<span>.</span></Link><Link className="closeSetup" href="/" aria-label="Close catalogue admin and return home"><span>Close</span><b aria-hidden="true">×</b></Link></nav>
+    <nav className="setupNav shell"><Link className="brand" href="/">Morning Ledger<span>.</span></Link><div className="adminNavLinks"><Link href="/admin/subscribers">Subscribers</Link><button type="button" onClick={logout}>Sign out</button><Link className="closeSetup" href="/" aria-label="Close catalogue admin and return home"><span>Close</span><b aria-hidden="true">×</b></Link></div></nav>
     <section className="setupWrap adminCatalogue">
       <p className="kicker">Catalogue admin</p><h1>Instrument refresh status.</h1>
       <p className="setupLead">The application searches this local catalogue. The free provider adapter refreshes it once per day.</p>

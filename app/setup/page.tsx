@@ -5,6 +5,8 @@ import { useState } from "react";
 import { InstrumentSearch } from "./InstrumentSearch";
 import { createDefaultNotifications, DEFAULT_PREFERENCES, hasEnabledNotification, NOTIFICATION_OPTIONS, NotificationPreference, togglePreference } from "../../lib/preferences";
 import { Instrument } from "../../lib/instruments";
+import { FIXED_NOTIFICATION_SCHEDULES } from "../../lib/briefing";
+import { isValidEmail } from "../../lib/subscriptions";
 
 const marketOptions = ["Canadian markets", "US markets", "European markets", "Asia-Pacific markets"];
 const contentOptions = [
@@ -27,15 +29,35 @@ export default function SetupPage() {
   const [notifications, setNotifications] = useState<Record<string, NotificationPreference>>(createDefaultNotifications);
   const [timeZone, setTimeZone] = useState("America/Toronto");
   const [notificationError, setNotificationError] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [submitError, setSubmitError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const next = () => {
+  const next = async () => {
     if (step === 2 && !hasEnabledNotification(notifications)) {
       setNotificationError("Choose at least one notification to continue.");
       return;
     }
     setNotificationError("");
-    if (step === 3) setComplete(true);
-    else setStep(value => value + 1);
+    if (step !== 3) { setStep(value => value + 1); return; }
+    if (!isValidEmail(email)) { setEmailError("Enter a valid email address to save your brief."); return; }
+    setEmailError(""); setSubmitError(""); setSubmitting(true);
+    try {
+      const response = await fetch("/api/subscriptions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: "personalized", email, name, markets, briefingStyle: style, experienceLevel: experience, contentToggles: content, timeZone,
+          watchlistInstrumentIds: watchlist.map(item => item.instrumentId),
+          notifications: Object.fromEntries(Object.entries(notifications).map(([id, preference]) => [id, preference.enabled])),
+        }),
+      });
+      const result = await response.json() as { error?: string; fields?: Record<string, string> };
+      if (!response.ok) { setEmailError(result.fields?.email || ""); throw new Error(result.error || "Unable to save your preferences."); }
+      setComplete(true);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Unable to save your preferences. Please try again.");
+    } finally { setSubmitting(false); }
   };
 
   const updateNotification = (id: string, changes: Partial<NotificationPreference>) => {
@@ -89,7 +111,7 @@ export default function SetupPage() {
                   <span className="choiceText"><strong>{option.title}</strong><small>{option.schedule}</small></span>
                   <button type="button" className="switchButton" role="switch" aria-checked={preference.enabled} aria-label={`${option.title} notification`} onClick={() => updateNotification(option.id, { enabled: !preference.enabled })}><span className="switch" aria-hidden="true"><span /></span></button>
                 </div>
-                {preference.enabled && <label className="notificationTime" htmlFor={`${option.id}-time`}><span>Delivery time</span><input id={`${option.id}-time`} type="time" value={preference.time} onChange={event => updateNotification(option.id, { time: event.target.value })} /></label>}
+                {preference.enabled && <div className="notificationTime"><span>Delivery time <small>Fixed for free edition</small></span><output aria-label={`${option.title} delivery time`}>{new Date(`2000-01-01T${preference.time}:00`).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</output></div>}
               </div>;
             })}
           </div>
@@ -106,14 +128,16 @@ export default function SetupPage() {
             <div><dt>Experience</dt><dd>{experience}</dd></div>
             <div><dt>Included content</dt><dd>{content.length ? content.join(" · ") : "Core headlines only"}</dd></div>
             <div><dt>Optional details</dt><dd>{[name && `Name: ${name}`, watchlist.length && `Watchlist: ${watchlist.map(item => `${item.symbol} (${item.exchange})`).join(", ")}`].filter(Boolean).join(" · ") || "None provided"}</dd></div>
-            <div><dt>Notifications</dt><dd className="notificationSummary">{NOTIFICATION_OPTIONS.filter(option => notifications[option.id].enabled).map(option => <span key={option.id}>{option.title} — {notifications[option.id].time}</span>)}</dd></div>
+            <div><dt>Notifications</dt><dd className="notificationSummary">{NOTIFICATION_OPTIONS.filter(option => notifications[option.id].enabled).map(option => <span key={option.id}>{option.title} — {FIXED_NOTIFICATION_SCHEDULES[option.id].label}</span>)}</dd></div>
             <div><dt>Time zone</dt><dd>{timeZone}</dd></div>
           </dl>
-          <label className="setupField summaryEmail"><span>Email address <small>Optional for now</small></span><input type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="you@company.com" /></label>
+          <label className="setupField summaryEmail"><span>Email address <small>Required</small></span><input type="email" inputMode="email" autoComplete="email" maxLength={254} required aria-invalid={Boolean(emailError)} aria-describedby="setup-email-error" value={email} onChange={event => { setEmail(event.target.value); setEmailError(""); setSubmitError(""); }} placeholder="you@company.com" /></label>
+          {emailError && <p id="setup-email-error" className="validationError" role="alert">{emailError}</p>}
+          {submitError && <p className="validationError" role="alert">{submitError}</p>}
         </>}
 
-        <div className="setupActions"><button type="button" className="backButton" onClick={() => setStep(value => Math.max(0, value - 1))} disabled={step === 0}>← Back</button><button type="button" className="nextButton" onClick={next}>{step === 3 ? "Finish setup" : "Continue →"}</button></div>
-      </> : <div className="completion"><div className="completionMark">✓</div><p className="kicker">You&apos;re all set</p><h1>Your brief is ready.</h1><p className="setupLead">{email ? `We’ll use ${email} when delivery is connected.` : "Your preferences are ready. Email delivery will be connected later."}</p><Link className="outlineButton" href="/">Return home →</Link></div>}
+        <div className="setupActions"><button type="button" className="backButton" onClick={() => setStep(value => Math.max(0, value - 1))} disabled={step === 0 || submitting}>← Back</button><button type="button" className="nextButton" onClick={next} disabled={submitting}>{submitting ? "Saving…" : step === 3 ? "Finish setup" : "Continue →"}</button></div>
+      </> : <div className="completion"><div className="completionMark">✓</div><p className="kicker">You&apos;re all set</p><h1>Your brief is ready.</h1><p className="setupLead">Your preferences are saved for {email}.</p><Link className="outlineButton" href="/">Return home →</Link></div>}
     </section>
   </main>;
 }

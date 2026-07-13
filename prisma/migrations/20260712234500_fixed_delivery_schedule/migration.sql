@@ -1,0 +1,3 @@
+ALTER TABLE "recipient_deliveries"
+  ADD COLUMN IF NOT EXISTS "deliveryTime" TEXT NOT NULL,
+  ADD COLUMN IF NOT EXISTS "timeZone" TEXT NOT NULL;

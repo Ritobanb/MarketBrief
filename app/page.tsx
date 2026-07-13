@@ -2,13 +2,27 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
+import { createHomepageSubscription, isValidEmail } from "../lib/subscriptions";
 
 export default function Home() {
   const [signupComplete, setSignupComplete] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [signupError, setSignupError] = useState("");
 
-  const handleSignup = (event: FormEvent<HTMLFormElement>) => {
+  const handleSignup = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setSignupComplete(true);
+    const form = new FormData(event.currentTarget);
+    const email = String(form.get("email") || "");
+    if (!isValidEmail(email)) { setSignupError("Enter a valid email address."); return; }
+    setSubmitting(true); setSignupError("");
+    try {
+      const response = await fetch("/api/subscriptions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(createHomepageSubscription(email)) });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error || "Unable to save your email.");
+      setSignupComplete(true);
+    } catch (error) {
+      setSignupError(error instanceof Error ? error.message : "Unable to save your email. Please try again.");
+    } finally { setSubmitting(false); }
   };
 
   return (
@@ -19,20 +33,32 @@ export default function Home() {
       </nav>
 
       <section className="hero shell">
+        <aside className="heroMarketVisual" aria-hidden="true">
+          <div className="visualHeader"><span>Morning signal</span><small>07:00</small></div>
+          <div className="signalBars"><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /></div>
+          <p className="visualCaption">One clear view before the opening bell.</p>
+          <dl><div><dt>Markets</dt><dd>Canada + US</dd></div><div><dt>Context</dt><dd>What moved &amp; why</dd></div><div><dt>Watchlist</dt><dd>Your tickers</dd></div></dl>
+        </aside>
         <div className="eyebrow"><span className="liveDot" /> Weekdays · 7:00 AM</div>
         <h1>The market, made<br />clear before coffee.</h1>
         <p className="heroCopy">A concise daily read on what moved, why it matters, and what to watch next. No noise. No hot takes.</p>
 
-        <form className="signup" onSubmit={handleSignup} data-testid="signup-form">
+        <form className="signup" onSubmit={handleSignup} data-testid="signup-form" noValidate>
           <label className="srOnly" htmlFor="email">Work email</label>
-          <input id="email" name="email" type="email" placeholder="you@company.com" required />
-          <button type="submit" disabled={signupComplete}>{signupComplete ? "You’re on the list ✓" : <>Get the daily brief <span aria-hidden="true">→</span></>}</button>
+          <input id="email" name="email" type="email" inputMode="email" autoComplete="email" maxLength={254} aria-invalid={Boolean(signupError)} aria-describedby="signup-status" placeholder="you@company.com" onChange={() => setSignupError("")} required />
+          <button type="submit" disabled={signupComplete || submitting}>{signupComplete ? "You’re on the list ✓" : submitting ? "Saving…" : <>Get the daily brief <span aria-hidden="true">→</span></>}</button>
         </form>
-        <p className="finePrint" role="status">{signupComplete ? "Thanks — your weekday brief is reserved. Email delivery will be connected later." : "Free weekday delivery. Unsubscribe anytime."}</p>
+        <p id="signup-status" className={signupError ? "finePrint validationError" : "finePrint"} role={signupError ? "alert" : "status"}>{signupError || (signupComplete ? "Thanks — your weekday brief preferences are saved." : "Free weekday delivery. Unsubscribe anytime.")}</p>
+        <div className="heroPersonalize" aria-label="Personalized market brief">
+          <div><span className="personalizeLabel">Recommended</span><strong>Want a brief built around you?</strong><p>Choose your markets, watchlist tickers, experience level, and the updates you want to receive.</p></div>
+          <Link href="/setup">Personalize my brief <span aria-hidden="true">→</span></Link>
+        </div>
       </section>
 
       <section className="briefPreview shell" aria-labelledby="inside-title">
         <div className="sectionIntro">
+          <div className="readingStamp" aria-hidden="true"><strong>05</strong><span>minute<br />read</span></div>
+          <div className="openingMotif" aria-hidden="true"><span className="openingSun" /><span className="openingLine" /><i /><i /><i /></div>
           <p className="kicker">Inside each edition</p>
           <h2 id="inside-title">Signal over volume.</h2>
           <p>Built to be read in under five minutes, with the context you need to start the day informed.</p>

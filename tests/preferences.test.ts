@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { FIXED_NOTIFICATION_SCHEDULES } from "../lib/briefing";
 import { createDefaultNotifications, DEFAULT_PREFERENCES, hasEnabledNotification, togglePreference, updateSelection } from "../lib/preferences";
+import { renderPersonalizedBrief } from "../services/briefing/render";
 
 describe("updateSelection", () => {
   it("adds and removes choices in a multi-select step", () => {
@@ -38,5 +40,39 @@ describe("updateSelection", () => {
     expect(hasEnabledNotification(notifications)).toBe(true);
     Object.values(notifications).forEach(notification => { notification.enabled = false; });
     expect(hasEnabledNotification(notifications)).toBe(false);
+  });
+
+  it("uses fixed free-edition notification times", () => {
+    expect(FIXED_NOTIFICATION_SCHEDULES).toMatchObject({
+      daily: { time: "07:00" }, premarket: { time: "08:00" }, close: { time: "16:30" }, weekly: { time: "18:00" },
+    });
+  });
+
+  it("renders personalization without another generation call", () => {
+    const rendered = renderPersonalizedBrief({
+      subject: "Daily brief", previewText: "Your update", marketOverview: "Markets are mixed.",
+      regionalSummaries: { "Canadian markets": "Canada is steady." },
+      stylePerspectives: { Balanced: "Keep moves in context." },
+      experienceExplanations: { "Beginner-friendly": "Focus on what changed." },
+      optionalSections: { "Top market-moving news": "Today’s main story." },
+      tickerSummaries: { inst_tcs: { headline: "TCS on NSE", summary: "A watchlist update." } },
+    }, {
+      name: "Ritoban", markets: ["Canadian markets"], briefingStyle: "Balanced",
+      experienceLevel: "Beginner-friendly", contentToggles: ["Top market-moving news"],
+      watchlist: [{ stableInstrumentId: "inst_tcs", symbol: "TCS", exchange: "NSE" }],
+    });
+    expect(rendered.text).toContain("Hi Ritoban,");
+    expect(rendered.text).toContain("TCS · NSE");
+    expect(rendered.html).toContain("max-width:680px");
+  });
+
+  it("uses a simple greeting when the optional name is missing", () => {
+    const rendered = renderPersonalizedBrief({
+      subject: "Daily brief", previewText: "Your update", marketOverview: "Markets are steady.",
+      regionalSummaries: {}, stylePerspectives: {}, experienceExplanations: {}, optionalSections: {}, tickerSummaries: {},
+    }, {
+      name: null, markets: [], briefingStyle: "Balanced", experienceLevel: "Beginner-friendly", contentToggles: [], watchlist: [],
+    });
+    expect(rendered.text).toContain("\nHi,\n");
   });
 });

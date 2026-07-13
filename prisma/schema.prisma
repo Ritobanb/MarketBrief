@@ -1,0 +1,198 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Instrument {
+  id                 BigInt   @id @default(autoincrement())
+  stableInstrumentId String   @unique
+  symbol             String
+  normalizedSymbol   String
+  name               String
+  normalizedName     String
+  exchange           String
+  country            String
+  assetType          String
+  currency           String
+  providerSymbol     String   @unique
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  lastProviderSyncAt DateTime
+  watchlistEntries   ProfileWatchlist[]
+
+  @@index([normalizedSymbol, isActive])
+  @@index([exchange, isActive])
+  @@index([assetType, isActive])
+  @@index([isActive])
+  @@map("instruments")
+}
+
+model CommunicationProfile {
+  id               String                @id @default(uuid())
+  email            String                @unique
+  name             String?
+  markets          Json
+  briefingStyle    String
+  experienceLevel  String
+  contentToggles   Json
+  timeZone         String                @default("America/Toronto")
+  isActive         Boolean               @default(true)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  watchlist        ProfileWatchlist[]
+  notifications    ProfileNotification[]
+  deliveries       RecipientDelivery[]
+
+  @@map("communication_profiles")
+}
+
+model ProfileWatchlist {
+  id           BigInt               @id @default(autoincrement())
+  profileId    String
+  instrumentId BigInt
+  profile      CommunicationProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  instrument   Instrument           @relation(fields: [instrumentId], references: [id])
+  createdAt    DateTime             @default(now())
+
+  @@unique([profileId, instrumentId])
+  @@index([instrumentId])
+  @@map("profile_watchlists")
+}
+
+model ProfileNotification {
+  id        BigInt               @id @default(autoincrement())
+  profileId String
+  cycleType String
+  enabled   Boolean              @default(true)
+  profile   CommunicationProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  @@unique([profileId, cycleType])
+  @@index([cycleType, enabled])
+  @@map("profile_notifications")
+}
+
+model BriefCycle {
+  id                String              @id @default(uuid())
+  cycleType         String
+  scheduledFor      DateTime
+  status            String              @default("pending")
+  llmCallCount      Int                 @default(0)
+  inputTokens       Int                 @default(0)
+  outputTokens      Int                 @default(0)
+  estimatedCostUsd  Decimal             @default(0) @db.Decimal(12, 6)
+  error             String?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  snapshot          MarketSnapshot?
+  generatedBrief    GeneratedBrief?
+  deliveries        RecipientDelivery[]
+
+  @@unique([cycleType, scheduledFor])
+  @@index([status, scheduledFor])
+  @@map("brief_cycles")
+}
+
+model MarketSnapshot {
+  id          String   @id @default(uuid())
+  cycleId     String   @unique
+  cycle       BriefCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  payload     Json
+  sources     Json
+  warnings    Json
+  collectedAt DateTime @default(now())
+
+  @@map("market_snapshots")
+}
+
+model GeneratedBrief {
+  id            String   @id @default(uuid())
+  cycleId       String   @unique
+  cycle         BriefCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  model         String
+  promptVersion String
+  content       Json
+  createdAt     DateTime @default(now())
+
+  @@map("generated_briefs")
+}
+
+model RecipientDelivery {
+  id             String               @id @default(uuid())
+  cycleId        String
+  profileId      String
+  idempotencyKey String               @unique
+  channel        String               @default("email")
+  status         String               @default("ready")
+  subject        String
+  previewText    String
+  body           String
+  htmlBody       String               @default("")
+  deliveryTime   String
+  timeZone       String
+  error          String?
+  createdAt      DateTime             @default(now())
+  sentAt         DateTime?
+  cycle          BriefCycle           @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  profile        CommunicationProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([cycleId, profileId, channel])
+  @@index([status, createdAt])
+  @@map("recipient_deliveries")
+}
+
+model CatalogueRefreshStatus {
+  id                      Int       @id @default(1)
+  status                  String    @default("never")
+  lastAttemptedAt         DateTime?
+  lastSuccessfulRefreshAt DateTime?
+  lastError               String?
+  activeCount             Int       @default(0)
+  inactiveCount           Int       @default(0)
+  recordsReceived         Int       @default(0)
+  recordsAdded            Int       @default(0)
+  recordsUpdated          Int       @default(0)
+  recordsDeactivated      Int       @default(0)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@map("catalogue_refresh_status")
+}
+
+model AdminUser {
+  id                  String         @id @default(uuid())
+  email               String         @unique
+  passwordHash        String
+  role                String         @default("admin")
+  isActive            Boolean        @default(true)
+  failedLoginAttempts Int            @default(0)
+  lockedUntil         DateTime?
+  lastLoginAt         DateTime?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  sessions            AdminSession[]
+
+  @@map("admin_users")
+}
+
+model AdminSession {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  lastSeenAt DateTime @default(now())
+  user      AdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("admin_sessions")
+}

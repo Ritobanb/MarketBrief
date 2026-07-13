@@ -1,3 +1,5 @@
+import { FIXED_NOTIFICATION_SCHEDULES } from "./briefing";
+
 export function updateSelection(
   selections: string[][],
   step: number,
@@ -22,14 +24,14 @@ export const DEFAULT_PREFERENCES = {
 
 export type NotificationPreference = {
   enabled: boolean;
-  time: string;
+  readonly time: string;
 };
 
 export const NOTIFICATION_OPTIONS = [
-  { id: "daily", title: "Daily Market Brief", schedule: "Weekday morning", defaultTime: "07:00", defaultEnabled: true },
-  { id: "premarket", title: "Premarket Brief", schedule: "Before markets open", defaultTime: "08:00", defaultEnabled: false },
-  { id: "close", title: "Market Close Summary", schedule: "After markets close", defaultTime: "16:30", defaultEnabled: false },
-  { id: "weekly", title: "Weekly Market Recap", schedule: "Sunday evening", defaultTime: "18:00", defaultEnabled: true },
+  { id: "daily", title: "Daily Market Brief", schedule: FIXED_NOTIFICATION_SCHEDULES.daily.cadence, defaultTime: FIXED_NOTIFICATION_SCHEDULES.daily.time, defaultEnabled: true },
+  { id: "premarket", title: "Premarket Brief", schedule: FIXED_NOTIFICATION_SCHEDULES.premarket.cadence, defaultTime: FIXED_NOTIFICATION_SCHEDULES.premarket.time, defaultEnabled: false },
+  { id: "close", title: "Market Close Summary", schedule: FIXED_NOTIFICATION_SCHEDULES.close.cadence, defaultTime: FIXED_NOTIFICATION_SCHEDULES.close.time, defaultEnabled: false },
+  { id: "weekly", title: "Weekly Market Recap", schedule: FIXED_NOTIFICATION_SCHEDULES.weekly.cadence, defaultTime: FIXED_NOTIFICATION_SCHEDULES.weekly.time, defaultEnabled: true },
 ] as const;
 
 export function createDefaultNotifications(): Record<string, NotificationPreference> {
